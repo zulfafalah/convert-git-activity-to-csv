@@ -9,6 +9,7 @@ import csv
 import subprocess
 import re
 import argparse
+import json
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -22,20 +23,33 @@ def get_author_filters():
     return [name.strip() for name in author_names.split(',') if name.strip()]
 
 def read_project_list(file_path):
-    """Read project directories from list_project.txt"""
+    """Read project directories and metadata from list_project.json"""
     projects = []
+    project_mapping = {}  # For mapping project path to application type
+    
     try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and os.path.exists(line):
-                    projects.append(line)
-                elif line:
-                    print(f"Warning: Project path does not exist: {line}")
-        return projects
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        for project in data.get('projects', []):
+            project_path = project.get('path', '').rstrip('/')
+            if project_path and os.path.exists(project_path):
+                projects.append(project_path)
+                # Create mapping from project path to project name for Application_type
+                project_mapping[project_path] = project.get('name', '')
+            elif project_path:
+                print(f"Warning: Project path does not exist: {project_path}")
+        
+        return projects, project_mapping
     except FileNotFoundError:
         print(f"Error: {file_path} not found")
-        return []
+        return [], {}
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in {file_path}: {str(e)}")
+        return [], {}
+    except Exception as e:
+        print(f"Error reading {file_path}: {str(e)}")
+        return [], {}
 
 def is_git_repository(path):
     """Check if the given path is a git repository"""
@@ -46,7 +60,7 @@ def is_git_repository(path):
     except:
         return False
 
-def get_git_log(repo_path, author_filters, today_only=False):
+def get_git_log(repo_path, author_filters, project_mapping, today_only=False):
     """Get git log for specified authors from a repository"""
     if not is_git_repository(repo_path):
         print(f"Warning: {repo_path} is not a git repository")
@@ -71,17 +85,21 @@ def get_git_log(repo_path, author_filters, today_only=False):
         result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
         
         if result.returncode == 0:
+            # Get application type from project mapping
+            application_type = project_mapping.get(repo_path, '')
+            
             for line in result.stdout.strip().split('\n'):
                 if line:
                     parts = line.split('|', 4)
                     if len(parts) == 5:
                         commit_hash, author_name, author_email, date, message = parts
                         commits.append({
-                            'commit_hash': commit_hash,
+                            'date': date,
                             'author_name': author_name,
                             'author_email': author_email,
-                            'date': date,
-                            'message': message.replace('\n', ' ').replace('\r', ' '),
+                            'Application_type': application_type,
+                            'Description_Technical': message.replace('\n', ' ').replace('\r', ' '),
+                            'commit_hash': commit_hash,
                             'project_path': repo_path
                         })
         else:
@@ -94,13 +112,25 @@ def get_git_log(repo_path, author_filters, today_only=False):
 
 def save_to_csv(commits, output_file):
     """Save commits data to CSV file"""
-    fieldnames = ['commit_hash', 'author_name', 'author_email', 'date', 'message', 'project_path']
+    fieldnames = ['commit_hash', 'author_name', 'author_email', 'date', 'Application_type', 'Description_Technical', 'project_path']
     
     try:
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(commits)
+            
+            for commit in commits:
+                # Reorder the commit data to match fieldnames
+                row = {
+                    'author_email': commit['author_email'],
+                    'date': commit['date'],
+                    'Application_type': commit['Application_type'],
+                    'Description_Technical': commit['Description_Technical'],
+                    'project_path': commit['project_path'],
+                    'commit_hash': commit['commit_hash'],
+                    'author_name': commit['author_name']
+                }
+                writer.writerow(row)
         print(f"Successfully saved {len(commits)} commits to {output_file}")
     except Exception as e:
         print(f"Error saving to CSV: {str(e)}")
@@ -123,8 +153,8 @@ def main():
     print(f"Author filters: {author_filters}")
     
     # Read project list
-    project_list_file = 'list_project.txt'
-    projects = read_project_list(project_list_file)
+    project_list_file = 'list_project.json'
+    projects, project_mapping = read_project_list(project_list_file)
     print(f"Found {len(projects)} projects to process")
     
     if not projects:
@@ -136,7 +166,7 @@ def main():
     
     for project_path in projects:
         print(f"Processing: {project_path}")
-        commits = get_git_log(project_path, author_filters, args.today)
+        commits = get_git_log(project_path, author_filters, project_mapping, args.today)
         all_commits.extend(commits)
         print(f"  Found {len(commits)} commits")
     

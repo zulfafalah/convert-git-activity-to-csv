@@ -1,0 +1,64 @@
+{
+  "projects": [
+    {
+      "name": "IDS WEB",
+      "path": "/home/fallah/Development/ids_samb/apps/samb",
+      "category": "Development",
+      "type": "ids_samb"
+    },
+    {
+      "name": "SFA Mobile App",
+      "path": "/home/fallah/AndroidStudioProjects/sfa_project/",
+      "category": "Android",
+      "type": "mobile"
+    },
+    {
+      "name": "Collector Mobile App",
+      "path": "/home/fallah/AndroidStudioProjects/ids_f/",
+      "category": "Android",
+      "type": "mobile"
+    },
+    {
+      "name": "Driver Mobile App",
+      "path": "/home/fallah/AndroidStudioProjects/driver-apps-mobile/",
+      "category": "Android",
+      "type": "mobile"
+    },
+    {
+      "name": "Merchandiser Mobile App",
+      "path": "/home/fallah/AndroidStudioProjects/Merchandiser-Mobile-Apps/",
+      "category": "Android",
+      "type": "mobile"
+    },
+    {
+      "name": "BACKEND SERVICES",
+      "path": "/home/fallah/Development/GOLANG/service-collection",
+      "category": "Development",
+      "type": "golang-service"
+    },
+    {
+      "name": "BACKEND SERVICES",
+      "path": "/home/fallah/Development/GOLANG/service-print/",
+      "category": "Development",
+      "type": "golang-service"
+    },
+    {
+      "name": "BACKEND SERVICES",
+      "path": "/home/fallah/Development/GOLANG/service-birt-runtime-engine/",
+      "category": "Development",
+      "type": "golang-service"
+    },
+    {
+      "name": "BACKEND SERVICES",
+      "path": "/home/fallah/Development/GOLANG/service-proxy/",
+      "category": "Development",
+      "type": "golang-service"
+    },
+    {
+      "name": "BACKEND SERVICES",
+      "path": "/home/fallah/Development/GOLANG/service-master/",
+      "category": "Development",
+      "type": "golang-service"
+    }
+  ]
+}
