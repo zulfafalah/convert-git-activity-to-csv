@@ -1,0 +1,5 @@
+*.csv
+*.csv#
+.env
+.venv
+env
