@@ -1,5 +1,4 @@
-{
-  "projects": [
+[
     {
       "name": "IDS WEB",
       "path": "/home/fallah/Development/ids_samb/apps/samb",
@@ -60,5 +59,4 @@
       "category": "Development",
       "type": "golang-service"
     }
-  ]
-}
+]

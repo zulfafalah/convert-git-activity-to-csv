@@ -31,7 +31,7 @@ def read_project_list(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
-        for project in data.get('projects', []):
+        for project in data:
             project_path = project.get('path', '').rstrip('/')
             if project_path and os.path.exists(project_path):
                 projects.append(project_path)
