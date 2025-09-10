@@ -10,7 +10,7 @@ import subprocess
 import re
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -21,6 +21,38 @@ def get_author_filters():
     """Get author name filters from environment variable"""
     author_names = os.getenv('author_name', '')
     return [name.strip() for name in author_names.split(',') if name.strip()]
+
+def parse_date(date_str):
+    """Parse date string in YYYY-MM-DD format"""
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD format.")
+
+def validate_date_args(args):
+    """Validate and process date arguments"""
+    if args.today:
+        # Today only
+        today = datetime.now().strftime('%Y-%m-%d')
+        return today, today, 'today'
+    
+    if len(args.dates) == 1:
+        # Specific date
+        date_str = args.dates[0].strftime('%Y-%m-%d')
+        return date_str, date_str, 'specific'
+    
+    if len(args.dates) == 2:
+        # Date range
+        start_date = args.dates[0]
+        end_date = args.dates[1]
+        
+        if start_date > end_date:
+            raise ValueError("Start date cannot be after end date")
+        
+        return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), 'range'
+    
+    # No date filter
+    return None, None, 'all'
 
 def read_project_list(file_path):
     """Read project directories and metadata from list_project.json"""
@@ -60,7 +92,7 @@ def is_git_repository(path):
     except:
         return False
 
-def get_git_log(repo_path, author_filters, project_mapping, today_only=False):
+def get_git_log(repo_path, author_filters, project_mapping, start_date=None, end_date=None):
     """Get git log for specified authors from a repository"""
     if not is_git_repository(repo_path):
         print(f"Warning: {repo_path} is not a git repository")
@@ -72,10 +104,13 @@ def get_git_log(repo_path, author_filters, project_mapping, today_only=False):
         # Build git log command with author filters
         cmd = ['git', 'log', '--pretty=format:%H|%an|%ae|%ai|%s']
         
-        # If today_only is True, add date filter for today
-        if today_only:
-            today = datetime.now().strftime('%Y-%m-%d')
-            cmd.extend(['--since', f'{today} 00:00:00', '--until', f'{today} 23:59:59'])
+        # Add date filters if specified
+        if start_date and end_date:
+            cmd.extend(['--since', f'{start_date} 00:00:00', '--until', f'{end_date} 23:59:59'])
+        elif start_date:
+            cmd.extend(['--since', f'{start_date} 00:00:00'])
+        elif end_date:
+            cmd.extend(['--until', f'{end_date} 23:59:59'])
         
         # If author filters are specified, add them to the command
         if author_filters:
@@ -138,15 +173,50 @@ def save_to_csv(commits, output_file):
 def main():
     """Main function to process all git repositories and generate CSV"""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Convert git logs from multiple projects to CSV')
-    parser.add_argument('--today', action='store_true', help='Filter commits to today only')
+    parser = argparse.ArgumentParser(
+        description='Convert git logs from multiple projects to CSV',
+        epilog='''
+Examples:
+  %(prog)s --today                    # Today's commits only
+  %(prog)s 2025-09-02                 # Specific date
+  %(prog)s 2025-09-01 2025-09-10      # Date range
+  %(prog)s                            # All commits
+        ''',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    parser.add_argument('--today', action='store_true', 
+                       help='Filter commits to today only')
+    parser.add_argument('dates', nargs='*', type=parse_date, 
+                       help='Date(s) in YYYY-MM-DD format. One date for specific day, two dates for range.')
+    
     args = parser.parse_args()
+    
+    # Validate argument combinations
+    if args.today and args.dates:
+        parser.error("Cannot use --today with date arguments")
+    
+    if len(args.dates) > 2:
+        parser.error("Too many date arguments. Provide at most 2 dates for a range.")
     
     print("Starting Git Activity to CSV conversion...")
     
-    if args.today:
-        today = datetime.now().strftime('%Y-%m-%d')
-        print(f"Filtering commits for today: {today}")
+    # Process date arguments
+    try:
+        start_date, end_date, date_mode = validate_date_args(args)
+    except ValueError as e:
+        print(f"Error: {e}")
+        return
+    
+    # Print date filter info
+    if date_mode == 'today':
+        print(f"Filtering commits for today: {start_date}")
+    elif date_mode == 'specific':
+        print(f"Filtering commits for specific date: {start_date}")
+    elif date_mode == 'range':
+        print(f"Filtering commits from {start_date} to {end_date}")
+    else:
+        print("No date filter applied - processing all commits")
     
     # Get author filters from environment
     author_filters = get_author_filters()
@@ -166,14 +236,21 @@ def main():
     
     for project_path in projects:
         print(f"Processing: {project_path}")
-        commits = get_git_log(project_path, author_filters, project_mapping, args.today)
+        commits = get_git_log(project_path, author_filters, project_mapping, start_date, end_date)
         all_commits.extend(commits)
         print(f"  Found {len(commits)} commits")
     
     # Generate output filename with timestamp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    if args.today:
+    if date_mode == 'today':
         output_file = f'git_log_today_{timestamp}.csv'
+    elif date_mode == 'specific':
+        date_suffix = start_date.replace('-', '')
+        output_file = f'git_log_{date_suffix}_{timestamp}.csv'
+    elif date_mode == 'range':
+        start_suffix = start_date.replace('-', '')
+        end_suffix = end_date.replace('-', '')
+        output_file = f'git_log_{start_suffix}_to_{end_suffix}_{timestamp}.csv'
     else:
         output_file = f'git_log_{timestamp}.csv'
     
