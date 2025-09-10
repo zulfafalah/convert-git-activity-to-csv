@@ -17,6 +17,19 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+def format_date_without_timezone(date_str):
+    """Remove timezone from date string (e.g., '2025-09-10 12:38:03 +0700' -> '2025-09-10 12:38:03')"""
+    try:
+        # Split the date string by space and take only date and time parts
+        parts = date_str.split()
+        if len(parts) >= 2:
+            # Return only date and time without timezone
+            return f"{parts[0]} {parts[1]}"
+        return date_str
+    except Exception:
+        # Return original string if parsing fails
+        return date_str
+
 def get_author_filters():
     """Get author name filters from environment variable"""
     author_names = os.getenv('author_name', '')
@@ -128,8 +141,10 @@ def get_git_log(repo_path, author_filters, project_mapping, start_date=None, end
                     parts = line.split('|', 4)
                     if len(parts) == 5:
                         commit_hash, author_name, author_email, date, message = parts
+                        # Format date to remove timezone
+                        formatted_date = format_date_without_timezone(date)
                         commits.append({
-                            'date': date,
+                            'date': formatted_date,
                             'author_name': author_name,
                             'author_email': author_email,
                             'Application_type': application_type,
@@ -150,6 +165,10 @@ def save_to_csv(commits, output_file):
     fieldnames = ['commit_hash', 'author_name', 'author_email', 'date', 'Application_type', 'Description_Technical', 'project_path']
     
     try:
+        # Create output directory if it doesn't exist
+        output_dir = Path(output_file).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
@@ -240,19 +259,19 @@ Examples:
         all_commits.extend(commits)
         print(f"  Found {len(commits)} commits")
     
-    # Generate output filename with timestamp
+    # Generate output filename with timestamp and save to output folder
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     if date_mode == 'today':
-        output_file = f'git_log_today_{timestamp}.csv'
+        output_file = f'output/git_log_today_{timestamp}.csv'
     elif date_mode == 'specific':
         date_suffix = start_date.replace('-', '')
-        output_file = f'git_log_{date_suffix}_{timestamp}.csv'
+        output_file = f'output/git_log_{date_suffix}_{timestamp}.csv'
     elif date_mode == 'range':
         start_suffix = start_date.replace('-', '')
         end_suffix = end_date.replace('-', '')
-        output_file = f'git_log_{start_suffix}_to_{end_suffix}_{timestamp}.csv'
+        output_file = f'output/git_log_{start_suffix}_to_{end_suffix}_{timestamp}.csv'
     else:
-        output_file = f'git_log_{timestamp}.csv'
+        output_file = f'output/git_log_{timestamp}.csv'
     
     # Save to CSV
     if all_commits:
