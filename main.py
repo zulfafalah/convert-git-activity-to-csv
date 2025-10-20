@@ -49,6 +49,11 @@ def validate_date_args(args):
         today = datetime.now().strftime('%Y-%m-%d')
         return today, today, 'today'
     
+    if args.yesterday:
+        # Yesterday only
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        return yesterday, yesterday, 'yesterday'
+    
     if len(args.dates) == 1:
         # Specific date
         date_str = args.dates[0].strftime('%Y-%m-%d')
@@ -197,6 +202,7 @@ def main():
         epilog='''
 Examples:
   %(prog)s --today                    # Today's commits only
+  %(prog)s --yesterday                # Yesterday's commits only
   %(prog)s 2025-09-02                 # Specific date
   %(prog)s 2025-09-01 2025-09-10      # Date range
   %(prog)s                            # All commits
@@ -206,6 +212,8 @@ Examples:
     
     parser.add_argument('--today', action='store_true', 
                        help='Filter commits to today only')
+    parser.add_argument('--yesterday', action='store_true', 
+                       help='Filter commits to yesterday only')
     parser.add_argument('dates', nargs='*', type=parse_date, 
                        help='Date(s) in YYYY-MM-DD format. One date for specific day, two dates for range.')
     
@@ -214,6 +222,12 @@ Examples:
     # Validate argument combinations
     if args.today and args.dates:
         parser.error("Cannot use --today with date arguments")
+    
+    if args.yesterday and args.dates:
+        parser.error("Cannot use --yesterday with date arguments")
+    
+    if args.today and args.yesterday:
+        parser.error("Cannot use --today and --yesterday together")
     
     if len(args.dates) > 2:
         parser.error("Too many date arguments. Provide at most 2 dates for a range.")
@@ -230,6 +244,8 @@ Examples:
     # Print date filter info
     if date_mode == 'today':
         print(f"Filtering commits for today: {start_date}")
+    elif date_mode == 'yesterday':
+        print(f"Filtering commits for yesterday: {start_date}")
     elif date_mode == 'specific':
         print(f"Filtering commits for specific date: {start_date}")
     elif date_mode == 'range':
@@ -263,6 +279,8 @@ Examples:
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     if date_mode == 'today':
         output_file = f'output/git_log_today_{timestamp}.csv'
+    elif date_mode == 'yesterday':
+        output_file = f'output/git_log_yesterday_{timestamp}.csv'
     elif date_mode == 'specific':
         date_suffix = start_date.replace('-', '')
         output_file = f'output/git_log_{date_suffix}_{timestamp}.csv'
